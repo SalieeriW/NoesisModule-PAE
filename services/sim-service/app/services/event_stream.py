@@ -1,0 +1,30 @@
+import asyncio
+import json
+
+import redis.asyncio as redis
+
+from app.core.config import settings
+
+
+CHANNEL = "sim-events"
+
+
+class SimEventStream:
+    def __init__(self):
+        self.client = redis.from_url(settings.redis_url, decode_responses=True)
+
+    async def publish(self, payload: dict):
+        await self.client.publish(CHANNEL, json.dumps(payload))
+
+    async def subscribe(self):
+        pubsub = self.client.pubsub()
+        await pubsub.subscribe(CHANNEL)
+        while True:
+            msg = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+            if msg and msg.get("data"):
+                yield json.loads(msg["data"])
+            else:
+                await asyncio.sleep(0.05)
+
+
+sim_event_stream = SimEventStream()

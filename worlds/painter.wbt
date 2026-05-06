@@ -1,0 +1,169 @@
+#VRML_SIM R2025a utf8
+
+# Starter world for the autonomous car-painting UR5e PoC.
+# Press Play in Webots and the painter_controller will:
+#   1) drive the arm to a "ready" pose where the wrist points along +X (toward the car),
+#   2) extract the URDF, build the ikpy chain, load YOLOv8-seg on MPS,
+#   3) loop perception + IK ~once per second.
+#
+# Coordinate convention: ENU (X east, Y north, Z up). The placeholder car body
+# (DEF CAR) is at +X relative to the robot base.
+
+# Use HTTPS URLs (pinned to the R2025a release) instead of the webots:// scheme
+# because the bundled Webots install on this machine doesn't ship the PROTO library
+# locally. Webots fetches these once and caches them under ~/Library/Caches/Webots.
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/Floor.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/universal_robots/protos/UR5e.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/vehicles/protos/tesla/TeslaModel3Simple.proto"
+
+WorldInfo {
+  basicTimeStep 32
+  coordinateSystem "ENU"
+}
+# Navigation camera (orbit / pan / zoom with the mouse). DEF so the Supervisor can
+# copy pose + FOV onto DEF VIEWPORT_RIG each tick — perception then matches the view.
+DEF MAIN_VIEWPOINT Viewpoint {
+  orientation -0.16 0.30 0.94 1.95
+  position 1.6 -2.0 1.6
+  followType "Mounted Shot"
+}
+TexturedBackground {
+}
+TexturedBackgroundLight {
+}
+# Floor: 10x10 so the 4.7 m Tesla doesn't overhang the edges (it sits along the
+# world Y axis after the 90° rotation). Plain matte mid-gray PBR appearance — no
+# checkerboard parquet — because the carparts YOLOv8-seg model was trained on car
+# photos with mostly clean studio backgrounds, and a busy tiled floor leaks
+# high-frequency texture into the camera frame which tanks detection confidence.
+# Floor (vs RectangleArena) has no walls, so the camera can never accidentally
+# frame a wall as the dominant object when scan poses 4/5 swing it off-axis.
+Floor {
+  size 10 10
+  tileSize 5 5
+  appearance PBRAppearance {
+    baseColor 0.45 0.45 0.47
+    roughness 0.85
+    metalness 0.0
+  }
+}
+
+# Painter pedestal: a static 0.5 m gray cylinder the UR5e is bolted on top of, so
+# the shoulder sits at z=0.663 instead of z=0.163. Raising the workspace lets the
+# arm reach door-handle height (~0.7 m) on the Tesla parked in front of it without
+# having to crouch. DEF PEDESTAL so the controller can drag it around the world
+# in lockstep with the UR5e when the user orbits the arm via the [ and ] keys.
+DEF PEDESTAL Solid {
+  translation 0 0 0.25
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.35 0.35 0.4
+        roughness 0.6
+        metalness 0.4
+      }
+      geometry Cylinder {
+        height 0.5
+        radius 0.18
+      }
+    }
+  ]
+  name "painter_pedestal"
+  boundingObject Cylinder {
+    height 0.5
+    radius 0.18
+  }
+}
+
+DEF UR5E_BASE UR5e {
+  translation 0 0 0.5
+  controller "painter_controller"
+  supervisor TRUE
+  selfCollision FALSE
+  # synchronization FALSE so Webots waits for our controller's slow init
+  # (YOLO weight load + URDF extraction + Open3D import on first run) instead
+  # of killing it after the default 1-second timeout.
+  synchronization FALSE
+  toolSlot [
+    Solid {
+      translation 0 0 0.05
+      # Rotate the wrapper so its local +X (Camera optical axis) aligns with the
+      # toolSlot's +Z (the spray-tool axis pointing out of the wrist flange).
+      # Webots Camera/RangeFinder are FLU: +X = forward, +Y = left, +Z = up.
+      rotation 0 1 0 -1.5708
+      children [
+        DEF EE_CAMERA Camera {
+          name "camera"
+          width 640
+          height 480
+          fieldOfView 1.047
+          near 0.05
+        }
+        RangeFinder {
+          name "range_finder"
+          width 640
+          height 480
+          fieldOfView 1.047
+          minRange 0.05
+          maxRange 5.0
+        }
+        # Visible spray-nozzle stub so you can see the tool tip in the 3D view.
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.9 0.6 0.1
+            roughness 0.4
+            metalness 0.6
+          }
+          geometry Cylinder {
+            height 0.05
+            radius 0.015
+          }
+        }
+      ]
+      name "tool"
+    }
+  ]
+}
+
+# RGB-D rig that tracks DEF MAIN_VIEWPOINT (Supervisor sync each tick). Placed
+# after UR5e so ``painter_controller`` usually runs before ``--viewport-camera-feed``.
+DEF VIEWPORT_RIG Robot {
+  translation 1.6 -2.0 1.6
+  rotation -0.16 0.30 0.94 1.95
+  name "viewport_rig"
+  controller "painter_controller"
+  controllerArgs [ "--viewport-camera-feed" ]
+  supervisor FALSE
+  children [
+    DEF VIEWPORT_RGB Camera {
+      name "viewport_rgb"
+      width 640
+      height 480
+      fieldOfView 1.047
+      near 0.05
+    }
+    DEF VIEWPORT_DEPTH RangeFinder {
+      name "viewport_depth"
+      width 640
+      height 480
+      fieldOfView 1.047
+      minRange 0.05
+      maxRange 10.0
+    }
+  ]
+}
+
+# Static Tesla Model 3 mesh — a realistic textured car the COCO yolov8n-seg
+# checkpoint will reliably detect as 'car'. Rotated 90° about Z so the LEFT
+# side (door panels) faces the robot. With the painter pedestal raising the
+# UR5e shoulder to z=0.663, translation x=1.8 puts the visible car wall about
+# 0.3 m from the camera at the ready pose AND ~0.7 m from the shoulder — well
+# inside the 0.85 m UR5e reach once the 0.25 m standoff is added.
+DEF CAR TeslaModel3Simple {
+  translation 1.8 0 0.4
+  rotation 0 0 1 1.5708
+  name "tesla"
+  controller "<none>"
+}

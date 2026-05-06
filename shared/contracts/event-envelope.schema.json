@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EventEnvelope",
+  "type": "object",
+  "required": ["event_id", "event_type", "source", "timestamp", "payload"],
+  "properties": {
+    "event_id": { "type": "string" },
+    "idempotency_key": { "type": "string" },
+    "event_type": { "type": "string" },
+    "source": { "type": "string" },
+    "session_id": { "type": ["integer", "null"] },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "payload": { "type": "object" }
+  }
+}
