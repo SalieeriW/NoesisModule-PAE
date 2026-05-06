@@ -1,0 +1,93 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: paintdb
+      POSTGRES_USER: paint
+      POSTGRES_PASSWORD: paint
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paint -d paintdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+
+  backend-api:
+    build:
+      context: ../services/backend-api
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgresql://paint:paint@postgres:5432/paintdb
+      REDIS_URL: redis://redis:6379/0
+      SIM_SERVICE_URL: http://sim-service:8081
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      sim-service:
+        condition: service_healthy
+
+  sim-service:
+    build:
+      context: ..
+      dockerfile: services/sim-service/Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ../controllers:/workspace/controllers
+      - ../worlds:/workspace/worlds
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/health', timeout=2)\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    depends_on:
+      redis:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ../services/frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    environment:
+      # Browser calls /api/v1 on the Vite dev server; proxy forwards to the API container.
+      VITE_PROXY_TARGET: http://backend-api:8080
+    depends_on:
+      backend-api:
+        condition: service_started
+
+volumes:
+  postgres-data:
+  minio-data:
