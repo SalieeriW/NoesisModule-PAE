@@ -18,6 +18,18 @@ import pathlib
 import numpy as np
 from controller import Robot
 
+
+def _atomic_replace(src, dst) -> None:
+    import shutil
+    try:
+        os.replace(src, dst)
+    except PermissionError:
+        try:
+            shutil.copy2(src, dst)
+            pathlib.Path(src).unlink(missing_ok=True)
+        except OSError:
+            pass  # file locked by Docker; drop this frame, next will succeed
+
 CACHE_DIR = pathlib.Path(__file__).resolve().parent / "viewport_cache"
 WRITE_EVERY_N_STEPS = 2
 
@@ -67,6 +79,6 @@ def run_viewport_feed() -> None:
         np.save(tmp_rgb, rgb)
         np.save(tmp_dep, dep)
         tmp_meta.write_text(json.dumps(meta), encoding="utf-8")
-        os.replace(tmp_rgb, fin_rgb)
-        os.replace(tmp_dep, fin_dep)
-        os.replace(tmp_meta, fin_meta)
+        _atomic_replace(tmp_rgb, fin_rgb)
+        _atomic_replace(tmp_dep, fin_dep)
+        _atomic_replace(tmp_meta, fin_meta)

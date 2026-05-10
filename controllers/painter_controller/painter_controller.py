@@ -26,11 +26,35 @@ import re
 import time
 from typing import List, Optional, Tuple
 
+
+def _atomic_replace(src, dst) -> None:
+    """os.replace() fails on Windows if dst is held open by another process."""
+    import shutil
+    try:
+        os.replace(src, dst)
+    except PermissionError:
+        try:
+            shutil.copy2(src, dst)
+            pathlib.Path(src).unlink(missing_ok=True)
+        except OSError:
+            pass  # file locked by Docker; drop this write, next tick will retry
+
 import numpy as np
 
 import cv2
 import open3d as o3d
+import torch
 from ultralytics import YOLO
+
+
+def _best_device() -> str:
+    if torch.backends.mps.is_available():
+        return "mps"
+    if torch.cuda.is_available():
+        return "cuda"
+    return "cpu"
+
+TORCH_DEVICE = _best_device()
 
 from controller import Keyboard, Supervisor
 
@@ -138,7 +162,7 @@ def export_operator_detections(cache_dir: pathlib.Path, usable: List[dict], sour
     tmp = cache_dir / ".tmp_detections.json"
     fin = cache_dir / "detections.json"
     tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    os.replace(tmp, fin)
+    _atomic_replace(tmp, fin)
 
 
 def write_operator_status(
@@ -178,7 +202,7 @@ def write_operator_status(
     tmp = cache_dir / ".tmp_operator_status.json"
     fin = cache_dir / "operator_status.json"
     tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    os.replace(tmp, fin)
+    _atomic_replace(tmp, fin)
 
 
 PERCEPTION_PERIOD_STEPS = 30
@@ -298,7 +322,8 @@ def _load_yolo_model() -> YOLO:
         path = MODEL_PATH_FALLBACK
         print(f"[painter] using fallback {path}")
     model = YOLO(path)
-    model.to("mps")
+    model.to(TORCH_DEVICE)
+    print(f"[painter] YOLO device: {TORCH_DEVICE}")
     return model
 
 
@@ -397,7 +422,7 @@ def capture_perception(ctx):
 
 
 def detect_all_targets(rgb: np.ndarray, model: YOLO) -> Tuple[List[dict], object]:
-    results = model.predict(rgb, device="mps", conf=YOLO_CONFIDENCE, verbose=False)
+    results = model.predict(rgb, device=TORCH_DEVICE, conf=YOLO_CONFIDENCE, verbose=False)
     target_classes = {"car"} if DEBUG_USE_COCO_FALLBACK else TARGET_CLASSES
 
     if not results:
