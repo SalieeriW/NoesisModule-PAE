@@ -134,6 +134,10 @@ export async function listRecentMaskRevisions(limit = 50) {
   return res.json();
 }
 
+export async function chatCommand(message, history = []) {
+  return post("/chat", { message, history });
+}
+
 async function post(path, body) {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",

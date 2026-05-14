@@ -4,6 +4,7 @@ import { RequireOperator } from "./components/RequireOperator";
 import { OperatorProvider } from "./context/OperatorContext";
 import { WorkbenchProvider } from "./context/WorkbenchContext";
 import { ActivityLog } from "./pages/ActivityLog";
+import { Chat } from "./pages/Chat";
 import { Inspection } from "./pages/Inspection";
 import { MaskReview } from "./pages/MaskReview";
 import { Overview } from "./pages/Overview";
@@ -48,6 +49,7 @@ export function App() {
               <Route path="mask" element={<MaskGate />} />
               <Route path="production" element={<ProductionGate />} />
               <Route path="activity" element={<ActivityLog />} />
+              <Route path="chat" element={<Chat />} />
               <Route path="team" element={<Team />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>

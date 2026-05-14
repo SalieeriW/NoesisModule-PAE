@@ -9,6 +9,7 @@ const nav = [
   { to: "/mask", label: "Mask approval" },
   { to: "/production", label: "Production" },
   { to: "/activity", label: "Operations" },
+  { to: "/chat", label: "Chat LLM" },
   { to: "/team", label: "Team" }
 ];
 

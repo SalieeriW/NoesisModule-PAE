@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     s3_secret_key: str = "minioadmin"
     s3_bucket: str = "paint-artifacts"
     jwt_secret: str = "change-me"
+    gemini_api_key: str = ""
+    gemini_model: str = "gemma-4-31b-it"
 
 
 settings = Settings()
