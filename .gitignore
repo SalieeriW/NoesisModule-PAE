@@ -4,6 +4,10 @@
 # Viewport feed cache (written at runtime by viewport-feed subprocess)
 controllers/painter_controller/viewport_cache/*.npy
 controllers/painter_controller/viewport_cache/*.json
+controllers/painter_controller/viewport_cache/mask_exports/*.png
+
+# Debug frames (overwritten each run)
+controllers/painter_controller/debug/*.png
 
 # Python
 .venv/
