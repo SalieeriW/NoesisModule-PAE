@@ -7,3 +7,4 @@ controllers/painter_controller/viewport_cache/*.json
 __pycache__/
 *.py[cod]
 .pytest_cache/
+PAE/Library/*

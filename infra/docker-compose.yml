@@ -58,9 +58,13 @@ services:
       - "8081:8081"
     environment:
       REDIS_URL: redis://redis:6379/0
+      # Unity runs on the host; host.docker.internal resolves to the host gateway on Docker Desktop
+      UNITY_URL: http://host.docker.internal:8082
+      YOLO_DEVICE: cpu
     volumes:
-      - ../controllers:/workspace/controllers
-      - ../worlds:/workspace/worlds
+      - mask-exports:/app/mask_exports
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test:
         [
@@ -82,7 +86,6 @@ services:
     ports:
       - "5173:5173"
     environment:
-      # Browser calls /api/v1 on the Vite dev server; proxy forwards to the API container.
       VITE_PROXY_TARGET: http://backend-api:8080
     depends_on:
       backend-api:
@@ -91,3 +94,4 @@ services:
 volumes:
   postgres-data:
   minio-data:
+  mask-exports:

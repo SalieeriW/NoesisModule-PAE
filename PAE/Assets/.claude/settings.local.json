@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"C:\\\\UNI\\\\PAE\\\\PAE\\\\Assets\" -Directory)",
+      "Bash(Select-Object Name)",
+      "PowerShell(ls -Recurse -Path \"C:\\\\UNI\\\\PAE\\\\PAE\\\\Assets\" -Directory | ForEach-Object { $_.FullName.Replace\\(\"C:\\\\UNI\\\\PAE\\\\PAE\\\\Assets\\\\\", \"\"\\) } | Sort-Object)"
+    ]
+  }
+}

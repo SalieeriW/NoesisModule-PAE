@@ -84,7 +84,7 @@ async def paint(request: PaintRequest):
 
 @router.get("/runtime/status")
 async def runtime_status():
-    return read_operator_status()
+    return await read_operator_status()
 
 
 _MASK_NAME_OK = re.compile(r"^[a-zA-Z0-9_.-]+\.png$")
@@ -154,7 +154,7 @@ async def stream_view():
 
 @router.post("/runtime/camera/control")
 async def control_camera(request: CameraControlRequest):
-    payload = write_camera_command(request.dx, request.dy, request.zoom)
+    payload = await write_camera_command(request.dx, request.dy, request.zoom)
     await sim_event_stream.publish({"type": "camera.control", "payload": payload})
     return {"status": "accepted", **payload}
 

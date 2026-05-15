@@ -37,6 +37,7 @@ export function WorkbenchProvider({ children }) {
   const [maskUri, setMaskUri] = useState("");
   const [maskBrushDirty, setMaskBrushDirty] = useState(false);
   const [notes, setNotes] = useState("");
+  const [paintColor, setPaintColor] = useState("#F5F5F5");
   const [busy, setBusy] = useState(false);
   const [simDetections, setSimDetections] = useState([]);
   const [selectedDetectionIndex, setSelectedDetectionIndex] = useState(0);
@@ -313,7 +314,7 @@ export function WorkbenchProvider({ children }) {
         detection_id: detection.id,
         approved_revision_id: revision.id,
         created_by: operatorApiId,
-        params: { color: "white", part_class: detection.part_class }
+        params: { color: paintColor, part_class: detection.part_class }
       });
       setPaintProgress(0);
       setPaintJob(job);
@@ -325,7 +326,7 @@ export function WorkbenchProvider({ children }) {
         detail: `Job #${job.id} · ${running?.status ?? "running"}`
       });
     });
-  }, [session, detection, revision, operatorApiId, withBusy, pushMilestone]);
+  }, [session, detection, revision, operatorApiId, paintColor, withBusy, pushMilestone]);
 
   const cancelJob = useCallback(async () => {
     if (!paintJob) return;
@@ -384,6 +385,8 @@ export function WorkbenchProvider({ children }) {
       operatorStatus,
       flowError,
       setFlowError,
+      paintColor,
+      setPaintColor,
       startRuntime,
       stopRuntime,
       beginFlow,
@@ -413,6 +416,7 @@ export function WorkbenchProvider({ children }) {
       paintProgress,
       operatorStatus,
       flowError,
+      paintColor,
       startRuntime,
       stopRuntime,
       beginFlow,

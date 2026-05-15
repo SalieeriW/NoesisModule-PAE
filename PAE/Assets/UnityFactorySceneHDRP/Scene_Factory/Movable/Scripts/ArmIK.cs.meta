@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: ef9970e4f2e62ff4d9272ff3ae6f5508
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 276400
+  packageName: UnityFactory
+  packageVersion: 1.0
+  assetPath: Assets/UnityFactorySceneHDRP/Scene_Factory/Movable/Scripts/ArmIK.cs
+  uploadId: 645177

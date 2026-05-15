@@ -995,6 +995,139 @@ a:hover {
   color: var(--text-muted);
 }
 
+/* —— Color palette (Production) —— */
+
+.color-palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.color-swatch {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--swatch-color, #888);
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+  outline: none;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.color-swatch:hover {
+  transform: scale(1.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.color-swatch--selected {
+  border-color: var(--text);
+  box-shadow: 0 0 0 3px var(--accent), 0 4px 12px rgba(0, 0, 0, 0.5);
+  transform: scale(1.15);
+}
+
+.color-swatch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.color-custom-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.color-custom-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.color-custom-input {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-strong);
+  background: var(--bg-elevated);
+  cursor: pointer;
+  padding: 2px;
+}
+
+.color-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-strong);
+  background: var(--bg-elevated);
+}
+
+.color-preview::before {
+  content: "";
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--swatch-color, #888);
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.color-preview__label {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.color-preview__hex {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* —— Job summary row (Production) —— */
+
+.job-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--bg-elevated);
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+
+.job-summary__swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--swatch-color, #888);
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+/* —— Inline colour dot (Overview kv) —— */
+
+.color-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--swatch-color, #888);
+  margin-right: 6px;
+  vertical-align: middle;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
 @media (max-width: 960px) {
   .shell {
     flex-direction: column;

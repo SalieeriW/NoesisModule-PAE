@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useWorkbench } from "../context/WorkbenchContext";
 import { vinHint } from "../lib/validation";
 
@@ -9,6 +10,7 @@ export function Inspection() {
     simDetections,
     selectedDetectionIndex,
     setSelectedDetectionIndex,
+    detection,
     beginFlow,
     applySelectedDetection,
     busy,
@@ -16,6 +18,8 @@ export function Inspection() {
     flowError,
     setFlowError
   } = useWorkbench();
+
+  const runtimeStopped = runtimeStatus !== "running";
 
   return (
     <div className="page fade-in">
@@ -30,6 +34,16 @@ export function Inspection() {
       {flowError && (
         <div className="banner banner--error">
           <p>{flowError}</p>
+        </div>
+      )}
+
+      {runtimeStopped && (
+        <div className="banner banner--warn">
+          <p>
+            Runtime is <strong>stopped</strong>. Go to{" "}
+            <Link to="/simulation">Simulation</Link> and start the runtime before
+            opening a session.
+          </p>
         </div>
       )}
 
@@ -55,14 +69,21 @@ export function Inspection() {
 
       <section className="panel">
         <h2 className="panel__title">Capture &amp; detect</h2>
-        <p className="panel__muted">
-          Requires runtime live and a signed-in operator (see Team).
-        </p>
+        {runtimeStopped ? (
+          <p className="panel__muted">
+            Start the runtime on the{" "}
+            <Link to="/simulation">Simulation</Link> page first.
+          </p>
+        ) : (
+          <p className="panel__muted">
+            Requires runtime live and a signed-in operator (see Team).
+          </p>
+        )}
         <div className="page__actions">
           <button
             type="button"
             className="btn"
-            disabled={busy || !!session || runtimeStatus !== "running"}
+            disabled={busy || !!session || runtimeStopped}
             onClick={() => beginFlow()}
           >
             Start session + capture + detect
@@ -77,6 +98,12 @@ export function Inspection() {
 
       <section className="panel">
         <h2 className="panel__title">Detected parts</h2>
+        {simDetections.length > 0 && (
+          <p className="panel__muted">
+            {simDetections.length} candidate{simDetections.length !== 1 ? "s" : ""} found.
+            {detection ? ` Active: ${detection.part_class}.` : ""}
+          </p>
+        )}
         <label className="field">
           <span className="field__label">YOLO candidates</span>
           <select

@@ -21,7 +21,7 @@ const cards = [
   {
     to: "/production",
     title: "Production",
-    text: "Execute the paint job and watch progress."
+    text: "Configure paint colour and execute the job."
   }
 ];
 
@@ -32,6 +32,7 @@ export function Overview() {
     detection,
     revision,
     paintJob,
+    paintColor,
     endSession,
     busy,
     flowError,
@@ -77,6 +78,13 @@ export function Overview() {
           <div>
             <dt>Mask revision</dt>
             <dd>{revision ? `#${revision.id} approved` : "—"}</dd>
+          </div>
+          <div>
+            <dt>Paint colour</dt>
+            <dd>
+              <span className="color-dot" style={{ "--swatch-color": paintColor }} />
+              {paintColor.toUpperCase()}
+            </dd>
           </div>
           <div>
             <dt>Paint job</dt>
