@@ -1,6 +1,12 @@
 # .env variables
 .env
 
+# Build files
+dist/
+
+# Deps
+node_modules/
+
 # Viewport feed cache (written at runtime by viewport-feed subprocess)
 controllers/painter_controller/viewport_cache/*.npy
 controllers/painter_controller/viewport_cache/*.json
