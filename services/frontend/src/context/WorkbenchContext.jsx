@@ -254,9 +254,63 @@ export function WorkbenchProvider({ children }) {
     }
   }, [operatorApiId, vin, withBusy, pushMilestone]);
 
-  const applySelectedDetection = useCallback(async () => {
+  const redetect = useCallback(async () => {
+    if (!session || !capture) return;
+    setFlowError("");
+    try {
+      await withBusy(async () => {
+        let simCap;
+        try {
+          simCap = await simCapture();
+        } catch (e) {
+          throw new Error(
+            "Capture failed — is Webots running with viewport feed? " + String(e?.message || e)
+          );
+        }
+        const c = await createCapture({
+          session_id: session.id,
+          frame_uri: apiUrl(simCap.frame_uri),
+          depth_uri: simCap.depth_uri,
+          camera_pose: simCap.camera_pose || {},
+          intrinsics: simCap.intrinsics || {}
+        });
+        setCapture(c);
+        const dets = await simDetect();
+        setSimDetections(dets);
+        setSelectedDetectionIndex(0);
+        setDetection(null);
+        if (!dets.length) {
+          pushMilestone({
+            kind: "detection",
+            title: "Re-detect: no YOLO candidates",
+            detail: "Check camera view or model classes"
+          });
+          return;
+        }
+        const best = dets[0];
+        const d = await createDetection({
+          capture_id: c.id,
+          part_class: best.part_class,
+          confidence: best.confidence,
+          bbox: best.bbox,
+          raw_mask_uri: apiUrl(best.raw_mask_uri)
+        });
+        setDetection(d);
+        pushMilestone({
+          kind: "detection",
+          title: "Re-detect recorded",
+          detail: `${best.part_class} · ${(best.confidence * 100).toFixed(0)}%`
+        });
+      });
+    } catch (e) {
+      setFlowError(String(e?.message || e));
+    }
+  }, [session, capture, withBusy, pushMilestone]);
+
+  const applySelectedDetection = useCallback(async (overrideIdx) => {
     if (!capture || !simDetections.length || !operatorApiId) return;
-    const selected = simDetections[selectedDetectionIndex] || simDetections[0];
+    const idx = overrideIdx !== undefined ? overrideIdx : selectedDetectionIndex;
+    const selected = simDetections[idx] || simDetections[0];
     await withBusy(async () => {
       const d = await createDetection({
         capture_id: capture.id,
@@ -387,6 +441,7 @@ export function WorkbenchProvider({ children }) {
       startRuntime,
       stopRuntime,
       beginFlow,
+      redetect,
       applySelectedDetection,
       submitMask,
       createAndExecuteJob,
@@ -416,6 +471,7 @@ export function WorkbenchProvider({ children }) {
       startRuntime,
       stopRuntime,
       beginFlow,
+      redetect,
       applySelectedDetection,
       submitMask,
       createAndExecuteJob,

@@ -29,18 +29,21 @@ class Action(str, Enum):
 
 
 class PieceTarget(str, Enum):
-    PUERTA_CONDUCTOR = "puerta_conductor"
-    PUERTA_ACOMPANANTE = "puerta_acompanante"
-    PARACHOQUES_FRONTAL = "parachoques_frontal"
-    PARACHOQUES_TRASERO = "parachoques_trasero"
-    CAPO = "capo"
-    MALETERO = "maletero"
-    TECHO = "techo"
-    ALERON = "aleron"
+    FRONT_LEFT_DOOR = "front_left_door"
+    FRONT_RIGHT_DOOR = "front_right_door"
+    BACK_LEFT_DOOR = "back_left_door"
+    BACK_RIGHT_DOOR = "back_right_door"
+    FRONT_DOOR = "front_door"
+    BACK_DOOR = "back_door"
+    FRONT_BUMPER = "front_bumper"
+    BACK_BUMPER = "back_bumper"
+    HOOD = "hood"
+    TRUNK = "trunk"
+    TAILGATE = "tailgate"
 
 
 class Target(BaseModel):
-    piece: PieceTarget
+    piece: PieceTarget | None = None
     vehicle_side: str | None = None
 
 
@@ -90,13 +93,23 @@ Tu unica funcion es convertir instrucciones en lenguaje natural a JSON estructur
 
 REGLAS:
 - Devuelve UNICAMENTE JSON valido. Sin texto adicional, sin explicaciones, sin markdown.
-- El campo "piece" debe ser exactamente uno de estos valores:
-  puerta_conductor, puerta_acompanante, parachoques_frontal, parachoques_trasero,
-  capo, maletero, techo, aleron
+- El campo "piece" debe ser exactamente uno de estos identificadores YOLO (en ingles):
+    front_left_door   -> puerta delantera izquierda (conductor en vehiculos europeos)
+    front_right_door  -> puerta delantera derecha (copiloto)
+    back_left_door    -> puerta trasera izquierda
+    back_right_door   -> puerta trasera derecha
+    front_door        -> puerta delantera (generico, sin especificar lado)
+    back_door         -> puerta trasera (generico, sin especificar lado)
+    front_bumper      -> parachoques delantero
+    back_bumper       -> parachoques trasero
+    hood              -> capo / cofre delantero
+    trunk             -> maletero / porton trasero
+    tailgate          -> porton trasero / compuerta
 - El campo "action" debe ser exactamente: "pintar" o "escanear"
-- Si la pieza es ambigua (ej. "el parachoques" sin especificar frontal o trasero),
-  pon clarification_needed=true y formula una pregunta concreta en clarification_question.
-  En ese caso pon confidence por debajo de 0.7.
+- Si la pieza es ambigua (ej. "la puerta" sin especificar delantera/trasera ni lado),
+  pon clarification_needed=true, formula una pregunta concreta en clarification_question,
+  y pon piece=null. En ese caso pon confidence por debajo de 0.2.
+- El campo "vehicle_side" pon siempre null (el lado ya esta codificado en "piece").
 - Si hay restricciones explicitas ("no toques el cristal", "evita la manilla"),
   incluelas en constraints como lista de strings descriptivos.
 - Si no se especifica color, pon null en color.
@@ -105,8 +118,8 @@ ESTRUCTURA JSON OBLIGATORIA:
 {
     "action": "pintar" | "escanear",
     "target": {
-        "piece": "<pieza>",
-        "vehicle_side": "<izquierda|derecha|null>"
+        "piece": "<identificador_yolo>",
+        "vehicle_side": null
     },
     "parameters": {
         "color": "<color o null>",

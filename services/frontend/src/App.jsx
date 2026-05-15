@@ -4,34 +4,15 @@ import { RequireOperator } from "./components/RequireOperator";
 import { OperatorProvider } from "./context/OperatorContext";
 import { WorkbenchProvider } from "./context/WorkbenchContext";
 import { ActivityLog } from "./pages/ActivityLog";
-import { Chat } from "./pages/Chat";
-import { Inspection } from "./pages/Inspection";
-import { MaskReview } from "./pages/MaskReview";
 import { Overview } from "./pages/Overview";
-import { Production } from "./pages/Production";
 import { Simulation } from "./pages/Simulation";
 import { Team } from "./pages/Team";
+import { Workcell } from "./pages/Workcell";
 
-function InspectionGate() {
+function WorkcellGate() {
   return (
     <RequireOperator>
-      <Inspection />
-    </RequireOperator>
-  );
-}
-
-function MaskGate() {
-  return (
-    <RequireOperator>
-      <MaskReview />
-    </RequireOperator>
-  );
-}
-
-function ProductionGate() {
-  return (
-    <RequireOperator>
-      <Production />
+      <Workcell />
     </RequireOperator>
   );
 }
@@ -45,12 +26,13 @@ export function App() {
             <Route element={<AppShell />}>
               <Route index element={<Overview />} />
               <Route path="simulation" element={<Simulation />} />
-              <Route path="inspection" element={<InspectionGate />} />
-              <Route path="mask" element={<MaskGate />} />
-              <Route path="production" element={<ProductionGate />} />
+              <Route path="process" element={<WorkcellGate />} />
               <Route path="activity" element={<ActivityLog />} />
-              <Route path="chat" element={<Chat />} />
               <Route path="team" element={<Team />} />
+              <Route path="inspection" element={<Navigate to="/process" replace />} />
+              <Route path="mask" element={<Navigate to="/process" replace />} />
+              <Route path="production" element={<Navigate to="/process" replace />} />
+              <Route path="chat" element={<Navigate to="/process" replace />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>

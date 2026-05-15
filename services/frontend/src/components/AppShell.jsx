@@ -5,12 +5,9 @@ import { useWorkbench } from "../context/WorkbenchContext";
 const nav = [
   { to: "/", label: "Overview", end: true },
   { to: "/simulation", label: "Simulation" },
-  { to: "/inspection", label: "Inspection" },
-  { to: "/mask", label: "Mask approval" },
-  { to: "/production", label: "Production" },
+  { to: "/process", label: "Process" },
   { to: "/activity", label: "Operations" },
-  { to: "/chat", label: "Chat LLM" },
-  { to: "/team", label: "Team" }
+  { to: "/team", label: "Team" },
 ];
 
 export function AppShell() {

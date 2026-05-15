@@ -1161,6 +1161,184 @@ a:hover {
   color: var(--text-muted);
 }
 
+/* —— Process stepper —— */
+
+.stepper {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 32px;
+  position: relative;
+}
+
+.stepper__step {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+
+.stepper__step:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 15px;
+  left: calc(50% + 18px);
+  right: calc(-50% + 18px);
+  height: 2px;
+  background: var(--line);
+  transition: background 0.3s ease;
+}
+
+.stepper__step--done:not(:last-child)::after {
+  background: var(--ok);
+}
+
+.stepper__circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  border: 2px solid var(--line-strong);
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stepper__step--active .stepper__circle {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--text);
+  box-shadow: 0 0 0 4px rgba(196, 92, 38, 0.15);
+}
+
+.stepper__step--done .stepper__circle {
+  border-color: var(--ok);
+  background: var(--ok-bg);
+  color: #b8e8cf;
+}
+
+.stepper__step--done.stepper__step--active .stepper__circle {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--text);
+  box-shadow: 0 0 0 4px rgba(196, 92, 38, 0.15);
+}
+
+.stepper__step--locked .stepper__circle {
+  opacity: 0.38;
+}
+
+.stepper__label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+  text-align: center;
+  transition: color 0.2s ease;
+}
+
+.stepper__step--active .stepper__label {
+  color: var(--text);
+}
+
+.stepper__step--done .stepper__label {
+  color: var(--ok);
+}
+
+.stepper__step--done.stepper__step--active .stepper__label {
+  color: var(--text);
+}
+
+.stepper__step--locked .stepper__label {
+  opacity: 0.38;
+}
+
+.stepper__step--clickable {
+  cursor: pointer;
+}
+
+.stepper__step--clickable:hover .stepper__circle {
+  filter: brightness(1.12);
+}
+
+/* —— Step content —— */
+
+.step-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.step-cols {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 18px;
+  align-items: start;
+}
+
+/* —— Embedded chat —— */
+
+.chat--embedded {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.chat__messages--embedded {
+  height: 220px;
+  min-height: 120px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-deep);
+  padding: 14px;
+  margin-bottom: 10px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chat__no-match {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #f0d9a0;
+}
+
+.step-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  padding: 18px 0 4px;
+  border-top: 1px solid var(--line);
+  margin-top: 8px;
+}
+
+.step-footer__hint {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.cmd-card__matched {
+  font-size: 11px;
+  color: #b8e8cf;
+  font-weight: 600;
+  padding: 2px 8px;
+  background: var(--ok-bg);
+  border: 1px solid rgba(61, 154, 110, 0.4);
+  border-radius: 999px;
+}
+
 @media (max-width: 960px) {
   .shell {
     flex-direction: column;
@@ -1199,5 +1377,9 @@ a:hover {
   .shell__content {
     padding-left: 20px;
     padding-right: 20px;
+  }
+
+  .step-cols {
+    grid-template-columns: 1fr;
   }
 }
