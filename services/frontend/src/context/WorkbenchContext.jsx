@@ -18,13 +18,13 @@ import {
   startSession
 } from "../lib/api";
 import { isValidVinOrDemo } from "../lib/validation";
-import { useOperator } from "./OperatorContext";
+import { useAuth } from "./AuthContext";
 
 const WorkbenchContext = createContext(null);
 
 export function WorkbenchProvider({ children }) {
-  const { activeOperator } = useOperator();
-  const operatorApiId = activeOperator?.id ?? "";
+  const { user } = useAuth();
+  const operatorApiId = user?.username ?? "";
 
   const [session, setSession] = useState(null);
   const [capture, setCapture] = useState(null);
@@ -32,7 +32,6 @@ export function WorkbenchProvider({ children }) {
   const [revision, setRevision] = useState(null);
   const [paintJob, setPaintJob] = useState(null);
   const [events, setEvents] = useState([]);
-  const [runtimeStatus, setRuntimeStatus] = useState("stopped");
   const [vin, setVin] = useState("");
   const [maskUri, setMaskUri] = useState("");
   const [maskBrushDirty, setMaskBrushDirty] = useState(false);
@@ -42,8 +41,12 @@ export function WorkbenchProvider({ children }) {
   const [selectedDetectionIndex, setSelectedDetectionIndex] = useState(0);
   const [paintProgress, setPaintProgress] = useState(0);
   const [operatorStatus, setOperatorStatus] = useState(null);
+  const runtimeStatus = operatorStatus != null && typeof operatorStatus.rgb_age_seconds === "number"
+    ? "running"
+    : "stopped";
   const [flowError, setFlowError] = useState("");
   const [milestones, setMilestones] = useState([]);
+  const [selectedColor, setSelectedColor] = useState("#f5f5f5");
   /** Bumps when the operator uploads an edited mask so an in-flight revision fetch cannot overwrite it. */
   const maskUploadEpochRef = useRef(0);
 
@@ -165,17 +168,11 @@ export function WorkbenchProvider({ children }) {
   }, []);
 
   const startRuntime = useCallback(async () => {
-    await withBusy(async () => {
-      await simStart();
-      setRuntimeStatus("running");
-    });
+    await withBusy(async () => { await simStart(); });
   }, [withBusy]);
 
   const stopRuntime = useCallback(async () => {
-    await withBusy(async () => {
-      await simStop();
-      setRuntimeStatus("stopped");
-    });
+    await withBusy(async () => { await simStop(); });
   }, [withBusy]);
 
   const beginFlow = useCallback(async () => {
@@ -367,7 +364,7 @@ export function WorkbenchProvider({ children }) {
         detection_id: detection.id,
         approved_revision_id: revision.id,
         created_by: operatorApiId,
-        params: { color: "white", part_class: detection.part_class }
+        params: { color: selectedColor, part_class: detection.part_class }
       });
       setPaintProgress(0);
       setPaintJob(job);
@@ -438,6 +435,8 @@ export function WorkbenchProvider({ children }) {
       operatorStatus,
       flowError,
       setFlowError,
+      selectedColor,
+      setSelectedColor,
       startRuntime,
       stopRuntime,
       beginFlow,
@@ -456,7 +455,6 @@ export function WorkbenchProvider({ children }) {
       revision,
       paintJob,
       events,
-      runtimeStatus,
       vin,
       maskUri,
       applyMaskUriFromUpload,
@@ -468,6 +466,7 @@ export function WorkbenchProvider({ children }) {
       paintProgress,
       operatorStatus,
       flowError,
+      selectedColor,
       startRuntime,
       stopRuntime,
       beginFlow,

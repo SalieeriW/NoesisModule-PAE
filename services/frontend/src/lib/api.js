@@ -1,3 +1,5 @@
+const TOKEN_KEY = "paintcell_token";
+
 function normalizeApiBase() {
   const raw = import.meta.env.VITE_API_BASE;
   if (raw != null && String(raw).trim() !== "") {
@@ -14,16 +16,17 @@ function normalizeApiBase() {
 
 const API_BASE = normalizeApiBase();
 
+function authHeader() {
+  const token = localStorage.getItem(TOKEN_KEY);
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 /** Turn `sim/runtime/...` paths from the API into absolute URLs. */
 export function apiUrl(path) {
   const p = path.startsWith("/") ? path.slice(1) : path;
   return `${API_BASE}/${p}`;
 }
 
-/**
- * Browser-openable href for mask PNGs. Handles `sim/runtime/masks/...`, full http(s) URLs, and
- * paths already prefixed with `/api/...` (must not run through apiUrl again — that doubles `/api/v1`).
- */
 export function maskAssetHref(uri) {
   if (!uri) return "#";
   const u = String(uri).trim();
@@ -32,7 +35,6 @@ export function maskAssetHref(uri) {
   return apiUrl(u);
 }
 
-/** URL suitable for `<img>` / canvas `loadImage` (same-origin relative `/api/...` or absolute). */
 export function maskDisplayUrl(stored) {
   if (!stored) return "";
   const u = String(stored).trim();
@@ -42,14 +44,56 @@ export function maskDisplayUrl(stored) {
   return apiUrl(u);
 }
 
+export async function fetchAsBlob(url) {
+  const resp = await fetch(url, { headers: authHeader() });
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const blob = await resp.blob();
+  return URL.createObjectURL(blob);
+}
+
+// ── Auth endpoints (no auth header needed) ────────────────────────────────────
+
+export async function apiLogin(username, password) {
+  const res = await fetch(`${API_BASE}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function apiRegister(username, email, password) {
+  const res = await fetch(`${API_BASE}/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, email, password }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function fetchPublicStats() {
+  const res = await fetch(`${API_BASE}/stats`);
+  if (!res.ok) return null;
+  return res.json();
+}
+
+// ── Protected endpoints ────────────────────────────────────────────────────────
+
 export async function listMaskRevisionsForDetection(detectionId) {
-  const res = await fetch(`${API_BASE}/masks/detection/${detectionId}/revisions`);
+  const res = await fetch(`${API_BASE}/masks/detection/${detectionId}/revisions`, {
+    headers: authHeader(),
+  });
+  if (!res.ok) handleUnauth(res);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
 export async function fetchRuntimeStatus() {
-  const res = await fetch(`${API_BASE}/sim/runtime/status`);
+  const res = await fetch(`${API_BASE}/sim/runtime/status`, {
+    headers: authHeader(),
+  });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -110,26 +154,30 @@ export function simStreamViewUrl() {
   return `${API_BASE}/sim/runtime/view/stream.mjpg`;
 }
 
-/** Upload operator-edited mask PNG; returns `{ mask_uri, filename }` (paths relative to sim). */
 export async function uploadMaskPng(blob) {
   const fd = new FormData();
   fd.append("file", blob, "mask.png");
   const res = await fetch(`${API_BASE}/sim/runtime/masks/upload`, {
     method: "POST",
-    body: fd
+    headers: authHeader(),
+    body: fd,
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
 export async function listSessions(limit = 40) {
-  const res = await fetch(`${API_BASE}/sessions?limit=${limit}`);
+  const res = await fetch(`${API_BASE}/sessions?limit=${limit}`, {
+    headers: authHeader(),
+  });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
 export async function listRecentMaskRevisions(limit = 50) {
-  const res = await fetch(`${API_BASE}/masks/revisions/recent?limit=${limit}`);
+  const res = await fetch(`${API_BASE}/masks/revisions/recent?limit=${limit}`, {
+    headers: authHeader(),
+  });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -138,12 +186,23 @@ export async function chatCommand(message, history = []) {
   return post("/chat", { message, history });
 }
 
+function handleUnauth(res) {
+  if (res.status === 401) {
+    localStorage.removeItem(TOKEN_KEY);
+    window.location.href = "/login";
+  }
+}
+
 async function post(path, body) {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
+    headers: { "Content-Type": "application/json", ...authHeader() },
+    body: JSON.stringify(body),
   });
+  if (res.status === 401) {
+    handleUnauth(res);
+    throw new Error("Session expired. Please log in again.");
+  }
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }

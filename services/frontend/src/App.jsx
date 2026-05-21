@@ -1,43 +1,48 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { AnimatedBg } from "./components/AnimatedBg";
 import { AppShell } from "./components/AppShell";
-import { RequireOperator } from "./components/RequireOperator";
-import { OperatorProvider } from "./context/OperatorContext";
+import { RequireAuth } from "./components/RequireAuth";
+import { AuthProvider } from "./context/AuthContext";
 import { WorkbenchProvider } from "./context/WorkbenchContext";
-import { ActivityLog } from "./pages/ActivityLog";
+import { History } from "./pages/History";
+import { Landing } from "./pages/Landing";
+import { Login } from "./pages/Login";
 import { Overview } from "./pages/Overview";
-import { Simulation } from "./pages/Simulation";
-import { Team } from "./pages/Team";
+import { Register } from "./pages/Register";
 import { Workcell } from "./pages/Workcell";
-
-function WorkcellGate() {
-  return (
-    <RequireOperator>
-      <Workcell />
-    </RequireOperator>
-  );
-}
 
 export function App() {
   return (
-    <OperatorProvider>
+    <AuthProvider>
+      <AnimatedBg />
       <WorkbenchProvider>
         <BrowserRouter>
           <Routes>
-            <Route element={<AppShell />}>
-              <Route index element={<Overview />} />
-              <Route path="simulation" element={<Simulation />} />
-              <Route path="process" element={<WorkcellGate />} />
-              <Route path="activity" element={<ActivityLog />} />
-              <Route path="team" element={<Team />} />
-              <Route path="inspection" element={<Navigate to="/process" replace />} />
-              <Route path="mask" element={<Navigate to="/process" replace />} />
-              <Route path="production" element={<Navigate to="/process" replace />} />
-              <Route path="chat" element={<Navigate to="/process" replace />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
+            {/* Public */}
+            <Route path="/" element={<Landing />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+
+            {/* Protected — inside AppShell */}
+            <Route element={<RequireAuth />}>
+              <Route element={<AppShell />}>
+                <Route path="/dashboard" element={<Overview />} />
+                <Route path="/process" element={<Workcell />} />
+                <Route path="/history" element={<History />} />
+                {/* Legacy redirects */}
+                <Route path="/simulation" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/inspection" element={<Navigate to="/process" replace />} />
+                <Route path="/mask" element={<Navigate to="/process" replace />} />
+                <Route path="/production" element={<Navigate to="/process" replace />} />
+                <Route path="/chat" element={<Navigate to="/process" replace />} />
+                <Route path="/activity" element={<Navigate to="/history" replace />} />
+                <Route path="/team" element={<Navigate to="/dashboard" replace />} />
+                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              </Route>
             </Route>
           </Routes>
         </BrowserRouter>
       </WorkbenchProvider>
-    </OperatorProvider>
+    </AuthProvider>
   );
 }

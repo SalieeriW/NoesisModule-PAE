@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { maskDisplayUrl, uploadMaskPng } from "../lib/api";
+import { fetchAsBlob, maskDisplayUrl, uploadMaskPng } from "../lib/api";
 
-function loadImage(src) {
-  return new Promise((resolve, reject) => {
-    const im = new Image();
-    im.crossOrigin = "anonymous";
-    im.onload = () => resolve(im);
-    im.onerror = () => reject(new Error(`Failed to load image: ${src}`));
-    im.src = src;
-  });
+async function loadImage(src) {
+  const blobUrl = await fetchAsBlob(src);
+  try {
+    return await new Promise((resolve, reject) => {
+      const im = new Image();
+      im.onload = () => resolve(im);
+      im.onerror = () => reject(new Error(`Failed to decode image: ${src}`));
+      im.src = blobUrl;
+    });
+  } finally {
+    URL.revokeObjectURL(blobUrl);
+  }
 }
 
 /**

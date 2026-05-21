@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     s3_secret_key: str = "minioadmin"
     s3_bucket: str = "paint-artifacts"
     jwt_secret: str = "change-me"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 480  # 8 hours (one shift)
     gemini_api_key: str = ""
     gemini_model: str = "gemma-4-31b-it"
 

@@ -1,609 +1,497 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
+import { ColorPad } from "../components/ColorPad";
 import { MaskOverlayEditor } from "../components/MaskOverlayEditor";
-import { useOperator } from "../context/OperatorContext";
+import { MiniViewport } from "../components/MiniViewport";
 import { useWorkbench } from "../context/WorkbenchContext";
 import { chatCommand } from "../lib/api";
-import { vinHint } from "../lib/validation";
 
 const STEPS = [
-  { label: "Session & Detection" },
-  { label: "Mask Review" },
-  { label: "Execute" },
+  { id: 0, label: "Scan" },
+  { id: 1, label: "Mask" },
+  { id: 2, label: "Paint" },
 ];
 
 export function Workcell() {
-  const { detection, revision } = useWorkbench();
-
+  const { detection, revision, paintJob, paintProgress, endSession } = useWorkbench();
   const maxStep = detection ? (revision ? 2 : 1) : 0;
-  const [viewStep, setViewStep] = useState(0);
+  const [step, setStep] = useState(0);
+
+  const isDone =
+    paintJob?.status === "completed" ||
+    paintJob?.status === "done" ||
+    (paintProgress >= 100 && !!paintJob);
+
+  async function handleNewJob() {
+    await endSession();
+    setStep(0);
+  }
 
   return (
     <div className="page fade-in">
-      <header className="page__hero">
-        <h1 className="page__title">Process</h1>
-        <p className="page__lede">
-          Guided painting workflow — session, detection, mask review, and execution in one place.
-        </p>
-      </header>
-
-      <ProcessStepper
-        steps={STEPS}
-        viewStep={viewStep}
-        maxStep={maxStep}
-        onStepClick={setViewStep}
-      />
-
-      {viewStep === 0 && <StepSession onContinue={() => setViewStep(1)} />}
-      {viewStep === 1 && <StepMask onContinue={() => setViewStep(2)} />}
-      {viewStep === 2 && <StepExecute />}
+      <WfStepper steps={STEPS} current={step} max={maxStep} onChange={setStep} />
+      {step === 0 && <StepScan onNext={() => setStep(1)} />}
+      {step === 1 && <StepMask onNext={() => setStep(2)} />}
+      {step === 2 && <StepPaint isDone={isDone} onNewJob={handleNewJob} />}
     </div>
   );
 }
 
-function ProcessStepper({ steps, viewStep, maxStep, onStepClick }) {
+/* ── Stepper ──────────────────────────────────────────────────────── */
+
+function WfStepper({ steps, current, max, onChange }) {
   return (
-    <nav className="stepper" aria-label="Process steps">
-      {steps.map((step, idx) => {
-        const isDone = idx < maxStep;
-        const isActive = idx === viewStep;
-        const isLocked = idx > maxStep;
-        const isClickable = !isLocked && !isActive;
-
-        let cls = "stepper__step";
-        if (isActive) cls += " stepper__step--active";
-        if (isDone) cls += " stepper__step--done";
-        if (isLocked) cls += " stepper__step--locked";
-        if (isClickable) cls += " stepper__step--clickable";
-
+    <div className="wf-stepper">
+      {steps.map((s, i) => {
+        const done = s.id < current;
+        const active = s.id === current;
+        const locked = s.id > max;
         return (
-          <div
-            key={idx}
-            className={cls}
-            onClick={() => isClickable && onStepClick(idx)}
-            role={isClickable ? "button" : undefined}
-            tabIndex={isClickable ? 0 : undefined}
-            onKeyDown={(e) => e.key === "Enter" && isClickable && onStepClick(idx)}
-            aria-current={isActive ? "step" : undefined}
-          >
-            <div className="stepper__circle">
-              {isDone && !isActive ? "✓" : idx + 1}
-            </div>
-            <span className="stepper__label">{step.label}</span>
+          <div key={s.id} style={{ display: "contents" }}>
+            <button
+              className={[
+                "wf-step",
+                active && "wf-step--active",
+                done && "wf-step--done",
+                locked && "wf-step--locked",
+              ].filter(Boolean).join(" ")}
+              disabled={locked}
+              onClick={() => !locked && onChange(s.id)}
+            >
+              <span className="wf-step__circle">{done ? "✓" : s.id + 1}</span>
+              <span className="wf-step__label">{s.label}</span>
+            </button>
+            {i < steps.length - 1 && (
+              <div className={`wf-connector${done ? " wf-connector--done" : ""}`} />
+            )}
           </div>
         );
       })}
-    </nav>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Step 1 — Session & Detection                                        */
-/* ------------------------------------------------------------------ */
-
-function StepSession({ onContinue }) {
-  const {
-    session,
-    vin,
-    setVin,
-    simDetections,
-    selectedDetectionIndex,
-    setSelectedDetectionIndex,
-    detection,
-    beginFlow,
-    redetect,
-    applySelectedDetection,
-    busy,
-    runtimeStatus,
-    flowError,
-    setFlowError,
-  } = useWorkbench();
-
-  return (
-    <div className="step-content fade-in">
-      {flowError && (
-        <div className="banner banner--error">
-          <p>{flowError}</p>
-        </div>
-      )}
-
-      <section className="panel">
-        <h2 className="panel__title">Vehicle</h2>
-        <div className="form">
-          <label className="field">
-            <span className="field__label">VIN or demo id</span>
-            <input
-              className="field__input"
-              value={vin}
-              onChange={(e) => {
-                setFlowError("");
-                setVin(e.target.value.toUpperCase());
-              }}
-              placeholder="e.g. 1HGBH41JXMN109186 or DEMO-LAB01"
-              autoComplete="off"
-            />
-            <span className="field__hint">{vinHint()}</span>
-          </label>
-        </div>
-        <div className="page__actions">
-          <button
-            type="button"
-            className="btn"
-            disabled={busy || !!session || runtimeStatus !== "running"}
-            onClick={() => beginFlow()}
-          >
-            Start session + capture + detect
-          </button>
-          {session && (
-            <button
-              type="button"
-              className="btn btn--secondary"
-              disabled={busy || runtimeStatus !== "running"}
-              onClick={() => redetect()}
-              title="Re-run capture and detection on the current session"
-            >
-              Re-detect
-            </button>
-          )}
-        </div>
-        <p className="help">
-          {session
-            ? `Session #${session.id} open · Close it from Overview when finished.`
-            : "No active session."}
-        </p>
-      </section>
-
-      <div className="step-cols">
-        <EmbeddedChat
-          simDetections={simDetections}
-          onSelect={(idx) => applySelectedDetection(idx)}
-          ready={simDetections.length > 0}
-        />
-
-        <section className="panel">
-          <h2 className="panel__title">Manual selection</h2>
-          {simDetections.length > 0 ? (
-            <>
-              <p className="panel__muted">
-                Use the dropdown if the assistant didn't match the right part.
-              </p>
-              <label className="field">
-                <span className="field__label">YOLO candidates</span>
-                <select
-                  className="field__input"
-                  value={selectedDetectionIndex}
-                  onChange={(e) => setSelectedDetectionIndex(Number(e.target.value))}
-                  disabled={busy}
-                >
-                  {simDetections.map((part, idx) => (
-                    <option key={`${part.part_class}-${idx}`} value={idx}>
-                      {part.part_class.replace(/_/g, " ")} · {(part.confidence * 100).toFixed(0)}%
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="page__actions">
-                <button
-                  type="button"
-                  className="btn btn--secondary"
-                  disabled={busy}
-                  onClick={() => applySelectedDetection()}
-                >
-                  Use selected part
-                </button>
-              </div>
-              {detection && (
-                <p className="help">
-                  Locked:{" "}
-                  <strong>{detection.part_class.replace(/_/g, " ")}</strong>{" "}
-                  · {(detection.confidence * 100).toFixed(0)}%
-                </p>
-              )}
-            </>
-          ) : (
-            <p className="panel__muted">
-              {session
-                ? "No parts detected — adjust the viewport and run a new session."
-                : "Start a session to see YOLO candidates."}
-            </p>
-          )}
-        </section>
-      </div>
-
-      {detection && (
-        <div className="step-footer">
-          <span className="step-footer__hint">
-            Locked: <strong>{detection.part_class.replace(/_/g, " ")}</strong>{" "}
-            · {(detection.confidence * 100).toFixed(0)}%
-          </span>
-          <button type="button" className="btn" onClick={onContinue}>
-            Continue to Mask Review →
-          </button>
-        </div>
-      )}
     </div>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* Embedded chat                                                        */
-/* ------------------------------------------------------------------ */
+/* ── Shared helpers ────────────────────────────────────────────────── */
 
-function EmbeddedChat({ simDetections, onSelect, ready }) {
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
-  const [chatBusy, setChatBusy] = useState(false);
-  const bottomRef = useRef(null);
+function ErrBanner({ children }) {
+  return (
+    <div className="banner banner--error banner--compact"><p>{children}</p></div>
+  );
+}
 
-  function scrollToBottom() {
-    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+function Chip({ ok, warn, paint, children }) {
+  const mod = ok ? "chip--ok" : warn ? "chip--warn" : paint ? "chip--paint" : "chip--neutral";
+  return <span className={`chip ${mod}`}>{children}</span>;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Step 1 — Scan & detect (with live viewport sidebar)
+   ═══════════════════════════════════════════════════════════════════ */
+
+const COLOR_ALIASES = {
+  blanco: "#f5f5f5", negro: "#1a1a1a", plata: "#c0c0c0", plateado: "#c0c0c0",
+  gris: "#6b7280", rojo: "#dc2626", azul: "#2563eb", verde: "#16a34a",
+  amarillo: "#eab308", naranja: "#ea580c", beige: "#d4b896",
+  white: "#f5f5f5", black: "#1a1a1a", silver: "#c0c0c0", gray: "#6b7280",
+  red: "#dc2626", blue: "#2563eb", green: "#16a34a", yellow: "#eab308",
+  orange: "#ea580c",
+  blanc: "#f5f5f5", noir: "#1a1a1a", rouge: "#dc2626", bleu: "#2563eb",
+  vert: "#16a34a", jaune: "#eab308",
+};
+
+function normalizeColorToHex(raw) {
+  if (!raw) return null;
+  const lower = raw.toLowerCase().trim();
+  if (COLOR_ALIASES[lower]) return COLOR_ALIASES[lower];
+  if (/^#[0-9a-f]{6}$/i.test(lower)) return lower;
+  return null;
+}
+
+function StepScan({ onNext }) {
+  const {
+    session, vin, setVin, simDetections, detection,
+    beginFlow, redetect, applySelectedDetection,
+    busy, runtimeStatus, flowError, setFlowError,
+    selectedColor, setSelectedColor,
+  } = useWorkbench();
+
+  const [nlInput, setNlInput] = useState("");
+  const [nlFeedback, setNlFeedback] = useState(null);
+  const [nlBusy, setNlBusy] = useState(false);
+
+  const runtimeOk = runtimeStatus === "running";
+
+  // selectedColor is a hex string when set from pad, or a name string when set from AI
+  // normalizeColorToHex ensures the pad always gets a valid hex
+  const colorHex = normalizeColorToHex(selectedColor) ?? selectedColor;
+
+  async function handleBegin() {
+    setFlowError("");
+    setNlFeedback(null);
+    await beginFlow();
   }
 
-  async function handleSend(e) {
+  async function handleNl(e) {
     e.preventDefault();
-    const text = input.trim();
-    if (!text || chatBusy) return;
-
-    const userMsg = { role: "user", display: text, rawContent: text };
-    const next = [...messages, userMsg];
-    setMessages(next);
-    setInput("");
-    setChatBusy(true);
-    scrollToBottom();
-
-    const history = messages.map((m) => ({ role: m.role, content: m.rawContent }));
-
+    const text = nlInput.trim();
+    if (!text || nlBusy) return;
+    setNlBusy(true);
+    setNlFeedback(null);
     try {
-      const res = await chatCommand(text, history);
-      const assistantMsg = {
-        role: "assistant",
-        rawContent: res.raw_text,
-        command: res.clarification_needed ? null : res.command,
-        clarification: res.clarification_needed ? res.clarification_question : null,
-        noMatch: null,
-        error: null,
-      };
+      const res = await chatCommand(text, []);
+      if (res.clarification_needed) {
+        setNlFeedback({ ok: false, text: `Clarify: ${res.clarification_question}` });
+        return;
+      }
+      const piece = res.command?.target?.piece;
+      const rawColor = res.command?.parameters?.color;
+      const feedbackParts = [];
 
-      if (!res.clarification_needed && res.command) {
-        const piece = res.command.target.piece;
-        const matchIdx = simDetections.findIndex((d) => d.part_class === piece);
-        if (matchIdx >= 0) {
-          assistantMsg.matched = true;
-          onSelect(matchIdx);
-        } else {
-          assistantMsg.noMatch = piece;
+      if (rawColor) {
+        const hex = normalizeColorToHex(rawColor);
+        if (hex) {
+          setSelectedColor(hex);
+          feedbackParts.push(`color → ${rawColor}`);
         }
       }
 
-      setMessages([...next, assistantMsg]);
-    } catch (err) {
-      setMessages([
-        ...next,
-        { role: "assistant", rawContent: "", error: String(err) },
-      ]);
+      if (piece && simDetections.length > 0) {
+        const idx = simDetections.findIndex((d) => d.part_class === piece);
+        if (idx >= 0) {
+          await applySelectedDetection(idx);
+          feedbackParts.push(`part → ${piece.replace(/_/g, " ")}`);
+          setNlInput("");
+          setNlFeedback({ ok: true, text: `✓ ${feedbackParts.join(" · ")}` });
+          setTimeout(() => onNext(), 600);
+          return;
+        } else {
+          feedbackParts.push(`"${piece.replace(/_/g, " ")}" not detected — tap a card`);
+        }
+      } else if (piece && simDetections.length === 0) {
+        feedbackParts.push("scan first, then describe the part");
+      }
+
+      if (feedbackParts.length > 0) {
+        setNlFeedback({ ok: !piece || simDetections.length === 0, text: feedbackParts.join(" · ") });
+      } else {
+        setNlFeedback({ ok: false, text: 'Could not understand — try: "paint the front bumper red"' });
+      }
+      setNlInput("");
+    } catch {
+      setNlFeedback({ ok: false, text: "Assistant unavailable — tap a card manually." });
     } finally {
-      setChatBusy(false);
-      scrollToBottom();
+      setNlBusy(false);
     }
   }
 
+  async function handleCardSelect(idx) {
+    await applySelectedDetection(idx);
+    onNext();
+  }
+
   return (
-    <section className="panel">
-      <h2 className="panel__title">Paint assistant</h2>
-      <p className="panel__muted">
-        Describe which part to paint — the assistant will select it automatically.
-      </p>
+    <div className="wf-content fade-in">
+      {flowError && <ErrBanner>{flowError}</ErrBanner>}
 
-      <div className="chat chat--embedded">
-        <div className="chat__messages chat__messages--embedded">
-          {messages.length === 0 && (
-            <div className="chat__empty">
-              {ready ? (
-                <p>Try: <em>&ldquo;Paint the front bumper cobalt blue&rdquo;</em></p>
-              ) : (
-                <p>Start a session and run detection first.</p>
-              )}
-            </div>
-          )}
+      {/* ── Viewport strip ── */}
+      <div className="scan-vp-strip">
+        <MiniViewport showControls />
+      </div>
 
-          {messages.map((msg, i) => (
-            <div key={i} className={`chat__msg chat__msg--${msg.role}`}>
-              {msg.role === "user" && (
-                <div className="chat__bubble chat__bubble--user">{msg.display}</div>
-              )}
+      {/* ── Vehicle ID + scan button ── */}
+      <div className="wf-scan-card">
+        <div className="wf-scan-card__row wf-scan-card__row--top">
+          <label className="field" style={{ flex: 1 }}>
+            <span className="field__label">Vehicle ID</span>
+            <input
+              className="field__input wf-vin-input"
+              value={vin}
+              onChange={(e) => { setFlowError(""); setVin(e.target.value.toUpperCase()); }}
+              placeholder="17-char VIN or DEMO-LAB01"
+              autoComplete="off"
+              disabled={busy}
+            />
+          </label>
+          <div className="wf-scan-card__actions">
+            <button
+              className="btn btn--lg"
+              disabled={busy || !!session || !runtimeOk}
+              onClick={handleBegin}
+            >
+              {busy ? "Scanning…" : "Scan & Detect"}
+            </button>
+            {session && (
+              <button className="btn btn--ghost" disabled={busy}
+                onClick={() => { setNlFeedback(null); redetect(); }}>
+                Re-scan
+              </button>
+            )}
+          </div>
+        </div>
+        {session && (
+          <div className="chip-row">
+            <Chip ok>Session #{session.id}</Chip>
+          </div>
+        )}
+      </div>
 
-              {msg.role === "assistant" && !msg.error && (
-                <div className="chat__bubble chat__bubble--assistant">
-                  {msg.clarification ? (
-                    <p className="chat__clarification">❓ {msg.clarification}</p>
-                  ) : msg.command ? (
-                    <EmbeddedCommandCard command={msg.command} matched={!!msg.matched} />
-                  ) : null}
-                  {msg.noMatch && (
-                    <p className="chat__no-match">
-                      <strong>{msg.noMatch.replace(/_/g, " ")}</strong> not detected in
-                      current frame — use the dropdown.
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {msg.error && (
-                <div className="banner banner--error banner--compact">
-                  <p>{msg.error}</p>
-                </div>
-              )}
-            </div>
-          ))}
-
-          {chatBusy && (
-            <div className="chat__msg chat__msg--assistant">
-              <div className="chat__bubble chat__bubble--assistant chat__bubble--thinking">
-                Analyzing command…
-              </div>
-            </div>
-          )}
-
-          <div ref={bottomRef} />
+      {/* ── AI Command Panel ── */}
+      <div className="ai-panel">
+        <div className="ai-panel__header">
+          <span className="ai-panel__title">AI Assistant</span>
+          <span className="ai-panel__hint">Describe what to paint in natural language</span>
         </div>
 
-        <form className="chat__input-row" onSubmit={handleSend}>
+        <form className="ai-panel__input-row" onSubmit={handleNl}>
           <input
-            className="field__input chat__input"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="E.g.: Paint the back bumper matte red…"
-            disabled={chatBusy || !ready}
+            className="ai-panel__input"
+            value={nlInput}
+            onChange={(e) => setNlInput(e.target.value)}
+            placeholder='e.g. "paint the front bumper red" or "left door in blue"'
+            disabled={nlBusy || busy}
             autoComplete="off"
           />
-          <button type="submit" className="btn" disabled={chatBusy || !input.trim() || !ready}>
-            {chatBusy ? "…" : "Send"}
+          <button
+            className="btn btn--lg ai-panel__send"
+            type="submit"
+            disabled={nlBusy || busy || !nlInput.trim()}
+          >
+            {nlBusy ? "…" : "Send"}
           </button>
         </form>
+
+        {nlFeedback && (
+          <p className={`ai-panel__feedback ai-panel__feedback--${nlFeedback.ok ? "ok" : "err"}`}>
+            {nlFeedback.text}
+          </p>
+        )}
+
+        {/* Color selection */}
+        <div className="ai-panel__color-section">
+          <div className="ai-panel__color-label">Paint color</div>
+          <ColorPad
+            value={colorHex}
+            onChange={setSelectedColor}
+            disabled={busy}
+          />
+        </div>
       </div>
-    </section>
-  );
-}
 
-function EmbeddedCommandCard({ command, matched }) {
-  const piece = (command.target.piece ?? "").replace(/_/g, " ");
-
-  return (
-    <div className="cmd-card">
-      <div className="cmd-card__header">
-        <span className={`cmd-card__action cmd-card__action--${command.action}`}>
-          {command.action}
-        </span>
-        <span className="cmd-card__piece">{piece}</span>
-        {matched && <span className="cmd-card__matched">✓ auto-selected</span>}
-      </div>
-
-      {(command.parameters.color || command.parameters.finish) && (
-        <dl className="kv cmd-card__params">
-          {command.parameters.color && (
-            <>
-              <dt>Color</dt>
-              <dd>{command.parameters.color}</dd>
-            </>
-          )}
-          {command.parameters.finish && (
-            <>
-              <dt>Acabado</dt>
-              <dd>{command.parameters.finish}</dd>
-            </>
-          )}
-        </dl>
+      {/* ── Detection results ── */}
+      {simDetections.length > 0 && (
+        <div className="wf-results fade-in">
+          <p className="wf-results__heading">
+            {simDetections.length} part{simDetections.length !== 1 ? "s" : ""} detected — tap to select
+          </p>
+          <div className="part-grid">
+            {simDetections.map((d, idx) => {
+              const active = detection?.part_class === d.part_class;
+              return (
+                <button
+                  key={idx}
+                  className={`part-card${active ? " part-card--active" : ""}`}
+                  onClick={() => handleCardSelect(idx)}
+                  disabled={busy}
+                >
+                  <span className="part-card__name">{d.part_class.replace(/_/g, " ")}</span>
+                  <span className="part-card__conf">{(d.confidence * 100).toFixed(0)}%</span>
+                  {active && <span className="part-card__check" aria-hidden>✓</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       )}
 
-      {command.constraints.length > 0 && (
-        <p className="cmd-card__constraints">
-          Restricciones: {command.constraints.join(", ")}
-        </p>
+      {simDetections.length === 0 && session && !busy && (
+        <p className="wf-empty">No parts detected. Check the viewport and re-scan.</p>
       )}
-
-      <div className="cmd-card__footer">
-        <span className="cmd-card__confidence">
-          Confidence {Math.round(command.confidence * 100)}%
-        </span>
-      </div>
     </div>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* Step 2 — Mask Review                                                 */
-/* ------------------------------------------------------------------ */
+/* ═══════════════════════════════════════════════════════════════════
+   Step 2 — Mask review
+   ═══════════════════════════════════════════════════════════════════ */
 
-function StepMask({ onContinue }) {
+function StepMask({ onNext }) {
   const {
-    capture,
-    detection,
-    maskUri,
-    applyMaskUriFromUpload,
-    setMaskBrushDirty,
-    notes,
-    setNotes,
-    submitMask,
-    revision,
-    busy,
-    flowError,
+    capture, detection, maskUri, applyMaskUriFromUpload,
+    setMaskBrushDirty, notes, setNotes, submitMask, revision, busy, flowError,
   } = useWorkbench();
 
   return (
-    <div className="step-content fade-in">
-      {flowError && (
-        <div className="banner banner--error">
-          <p>{flowError}</p>
-        </div>
-      )}
+    <div className="wf-content fade-in">
+      {flowError && <ErrBanner>{flowError}</ErrBanner>}
 
-      <div className="banner banner--compact">
-        <p>
-          <strong>Preview</strong> — Drag on the canvas to add or erase mask pixels. Use{" "}
-          <em>Use edited mask</em> to upload the PNG, then approve the revision.
-        </p>
+      <div className="chip-row">
+        {detection && (
+          <>
+            <Chip ok>{detection.part_class.replace(/_/g, " ")}</Chip>
+            <Chip>{(detection.confidence * 100).toFixed(0)}% confidence</Chip>
+          </>
+        )}
+        {revision && <Chip ok>Revision #{revision.id} approved</Chip>}
       </div>
 
-      {detection && (
-        <section className="panel">
-          <h2 className="panel__title">Detection</h2>
-          <dl className="kv">
-            <div>
-              <dt>Part</dt>
-              <dd>{detection.part_class.replace(/_/g, " ")}</dd>
-            </div>
-            <div>
-              <dt>Confidence</dt>
-              <dd>{(detection.confidence * 100).toFixed(1)}%</dd>
-            </div>
-          </dl>
-        </section>
-      )}
+      <MaskOverlayEditor
+        frameUrl={capture?.frame_uri || ""}
+        maskUrl={(maskUri || detection?.raw_mask_uri || "").trim()}
+        onMaskUri={applyMaskUriFromUpload}
+        onBrushDirtyChange={setMaskBrushDirty}
+        disabled={!detection || !capture}
+        busy={busy}
+      />
 
-      <section className="panel">
-        <h2 className="panel__title">Mask over capture frame</h2>
-        <MaskOverlayEditor
-          frameUrl={capture?.frame_uri || ""}
-          maskUrl={(maskUri || detection?.raw_mask_uri || "").trim()}
-          onMaskUri={applyMaskUriFromUpload}
-          onBrushDirtyChange={setMaskBrushDirty}
-          disabled={!detection || !capture}
-          busy={busy}
+      <div className="wf-mask-footer">
+        <textarea
+          className="field__input field__textarea"
+          rows={2}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Operator notes (optional)"
+          style={{ resize: "none", flex: 1, minWidth: 0 }}
         />
-      </section>
-
-      <section className="panel">
-        <h2 className="panel__title">Revision record</h2>
-        <div className="form">
-          <label className="field">
-            <span className="field__label">Mask artifact URI</span>
-            <input className="field__input mono" readOnly value={maskUri || "—"} />
-            <span className="field__hint">
-              YOLO export path, or an uploaded{" "}
-              <span className="mono">edited_*.png</span> after editing.
-            </span>
-          </label>
-          <label className="field">
-            <span className="field__label">Operator notes</span>
-            <textarea
-              className="field__input field__textarea"
-              rows={3}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="QA context, deviations, traceability"
-            />
-          </label>
-        </div>
-        <div className="page__actions">
-          <button
-            type="button"
-            className="btn"
-            disabled={busy || !detection || !!revision}
-            onClick={() => submitMask()}
-          >
-            {revision ? "Revision approved ✓" : "Approve mask revision"}
+        {!revision ? (
+          <button className="btn btn--lg" disabled={busy || !detection} onClick={() => submitMask()}>
+            {busy ? "Approving…" : "Approve mask"}
           </button>
-        </div>
-        <p className="help">
-          {revision
-            ? `Revision #${revision.id} recorded.`
-            : "No approved revision yet."}
-        </p>
-      </section>
-
-      {revision && (
-        <div className="step-footer">
-          <span className="step-footer__hint">
-            Revision #{revision.id} approved.
-          </span>
-          <button type="button" className="btn" onClick={onContinue}>
-            Continue to Execute →
+        ) : (
+          <button className="btn btn--lg" onClick={onNext}>
+            Continue to Paint →
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* Step 3 — Execute                                                     */
-/* ------------------------------------------------------------------ */
+/* ═══════════════════════════════════════════════════════════════════
+   Step 3 — Execute
+   ═══════════════════════════════════════════════════════════════════ */
 
-function StepExecute() {
+function StepPaint({ isDone, onNewJob }) {
   const {
-    session,
-    detection,
-    revision,
-    paintJob,
-    createAndExecuteJob,
-    cancelJob,
-    busy,
-    operatorStatus,
-    paintProgress,
-    flowError,
+    session, detection, revision, paintJob,
+    createAndExecuteJob, cancelJob, busy,
+    operatorStatus, paintProgress, flowError,
+    selectedColor,
   } = useWorkbench();
 
   const barPercent =
     operatorStatus?.sim_state === "PAINT" &&
-    operatorStatus?.paint &&
-    typeof operatorStatus.paint.percent === "number"
+    typeof operatorStatus.paint?.percent === "number"
       ? operatorStatus.paint.percent
       : paintProgress;
 
   const ready = !!(session && detection && revision);
-  const webotsPainting = operatorStatus?.sim_state === "PAINT";
+  const isPainting = !isDone && (paintJob?.status === "running" || operatorStatus?.sim_state === "PAINT");
+  const simState = operatorStatus?.sim_state ?? "—";
 
   return (
-    <div className="step-content fade-in">
-      {flowError && (
-        <div className="banner banner--error">
-          <p>{flowError}</p>
-        </div>
-      )}
+    <div className="wf-content fade-in">
+      {flowError && <ErrBanner>{flowError}</ErrBanner>}
 
-      <section className="panel">
-        <h2 className="panel__title">Prerequisites</h2>
-        <ul className="checklist">
-          <li className={session ? "ok" : ""}>Active session</li>
-          <li className={detection ? "ok" : ""}>Detection locked</li>
-          <li className={revision ? "ok" : ""}>Approved mask revision</li>
-        </ul>
-      </section>
+      {/* Live viewport */}
+      <div className="scan-vp-strip">
+        <MiniViewport showControls />
+      </div>
 
-      <section className="panel">
-        <h2 className="panel__title">Execute</h2>
-        <div className="page__actions">
-          <button
-            type="button"
-            className="btn"
-            disabled={busy || !ready}
-            onClick={() => createAndExecuteJob()}
-          >
-            Execute paint job
-          </button>
-          <button
-            type="button"
-            className="btn btn--danger"
-            disabled={busy || (!paintJob && !webotsPainting)}
-            onClick={() => cancelJob()}
-          >
-            Cancel job
-          </button>
+      {/* Job info grid */}
+      <div className="wf-paint-info">
+        <div className="wf-paint-info__cell">
+          <span className="wf-paint-info__label">Session</span>
+          <span className="wf-paint-info__value mono">{session ? `#${session.id}` : "—"}</span>
         </div>
-        <p className="help mono">Status: {paintJob?.status ?? "idle"}</p>
-        <div
-          className="progress"
-          role="progressbar"
-          aria-valuenow={barPercent}
-          aria-valuemin={0}
-          aria-valuemax={100}
-        >
-          <div className="progress__fill" style={{ width: `${barPercent}%` }} />
+        <div className="wf-paint-info__cell">
+          <span className="wf-paint-info__label">Part</span>
+          <span className="wf-paint-info__value">{detection ? detection.part_class.replace(/_/g, " ") : "—"}</span>
         </div>
-        <p className="help">
-          Progress {barPercent}%
-          {operatorStatus?.sim_state === "PAINT" ? " · Webots PAINT" : " · API / idle"}
-        </p>
-      </section>
+        <div className="wf-paint-info__cell">
+          <span className="wf-paint-info__label">Mask rev</span>
+          <span className="wf-paint-info__value mono">{revision ? `#${revision.id}` : "—"}</span>
+        </div>
+        <div className="wf-paint-info__cell">
+          <span className="wf-paint-info__label">Job</span>
+          <span className="wf-paint-info__value mono">{paintJob ? `#${paintJob.id}` : "—"}</span>
+        </div>
+        <div className="wf-paint-info__cell">
+          <span className="wf-paint-info__label">Color</span>
+          <span className="wf-paint-info__value" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {(() => {
+              const c = paintJob?.params?.color ?? selectedColor;
+              return (
+                <>
+                  <span style={{ width: 16, height: 16, borderRadius: 4, background: c, border: "1px solid rgba(255,255,255,0.15)", flexShrink: 0 }} />
+                  <span className="mono" style={{ fontSize: 12 }}>{c || "—"}</span>
+                </>
+              );
+            })()}
+          </span>
+        </div>
+        <div className="wf-paint-info__cell">
+          <span className="wf-paint-info__label">Sim state</span>
+          <span className="wf-paint-info__value">
+            <Chip ok={simState === "PAINT"} warn={simState === "—"} paint={simState === "PAINT"}>
+              {simState}
+            </Chip>
+          </span>
+        </div>
+      </div>
+
+      {/* Progress + actions */}
+      <div className="wf-paint-card">
+        {isDone ? (
+          <>
+            <div className="wf-paint-done">
+              <span className="wf-paint-done__check">✓</span>
+              <div>
+                <p className="wf-paint-done__title">Paint job complete</p>
+                <p className="wf-paint-done__detail">
+                  Job #{paintJob?.id} · {detection?.part_class?.replace(/_/g, " ")}
+                </p>
+              </div>
+            </div>
+            <div className="paint-bar">
+              <div className="paint-bar__fill paint-bar__fill--done" style={{ width: "100%" }} />
+            </div>
+            <button
+              className="btn btn--lg wf-paint-btn"
+              disabled={busy}
+              onClick={onNewJob}
+            >
+              {busy ? "Closing…" : "Close session & start new job"}
+            </button>
+          </>
+        ) : isPainting ? (
+          <>
+            <div className="wf-paint-progress-header">
+              <span className="wf-paint-label">Painting in progress</span>
+              <span className="wf-paint-pct">{barPercent}%</span>
+            </div>
+            <div className="paint-bar">
+              <div className="paint-bar__fill" style={{ width: `${barPercent}%` }} />
+            </div>
+            <button className="btn btn--ghost btn--sm" disabled={busy} onClick={() => cancelJob()}>
+              Cancel job
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="chip-row">
+              <Chip ok={!!session} warn={!session}>Session</Chip>
+              <Chip ok={!!detection} warn={!detection}>Detection</Chip>
+              <Chip ok={!!revision} warn={!revision}>Mask approved</Chip>
+            </div>
+            <button
+              className="btn btn--lg wf-paint-btn"
+              disabled={busy || !ready}
+              onClick={() => createAndExecuteJob()}
+            >
+              Execute paint job
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }

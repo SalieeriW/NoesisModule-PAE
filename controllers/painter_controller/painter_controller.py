@@ -209,6 +209,39 @@ PERCEPTION_PERIOD_STEPS = 30
 MIN_MASK_POINTS = 10
 
 PAINT_MARK_COLOR = (1.0, 1.0, 1.0)
+
+_COLOR_NAME_MAP: dict[str, tuple[float, float, float]] = {
+    "white":   (1.00, 1.00, 1.00),
+    "black":   (0.05, 0.05, 0.05),
+    "silver":  (0.75, 0.75, 0.75),
+    "gray":    (0.42, 0.45, 0.50),
+    "grey":    (0.42, 0.45, 0.50),
+    "red":     (0.86, 0.15, 0.15),
+    "blue":    (0.15, 0.38, 0.92),
+    "green":   (0.09, 0.64, 0.29),
+    "yellow":  (0.92, 0.71, 0.03),
+    "orange":  (0.92, 0.35, 0.05),
+    "beige":   (0.83, 0.72, 0.59),
+}
+
+
+def _color_to_rgb(color_str: str) -> tuple[float, float, float]:
+    if not color_str:
+        return PAINT_MARK_COLOR
+    s = str(color_str).strip().lower()
+    if s in _COLOR_NAME_MAP:
+        return _COLOR_NAME_MAP[s]
+    if s.startswith("#") and len(s) == 7:
+        try:
+            r = int(s[1:3], 16) / 255.0
+            g = int(s[3:5], 16) / 255.0
+            b = int(s[5:7], 16) / 255.0
+            return (r, g, b)
+        except ValueError:
+            pass
+    return PAINT_MARK_COLOR
+
+
 SPRAY_STAMP_RADIUS_M = 0.028
 SPRAY_STAMP_DOTS = 10
 WAYPOINTS_PER_TICK = 10
@@ -885,13 +918,15 @@ def camera_to_base_transform(cam_node, base_node) -> np.ndarray:
 # --- Paint visualization ------------------------------------------------------
 
 
-def _ensure_paint_layer(robot, paint_state: dict) -> bool:
+def _ensure_paint_layer(
+    robot,
+    paint_state: dict,
+    color: tuple[float, float, float] = PAINT_MARK_COLOR,
+) -> bool:
     """Create/reuse a single PointSet layer for fast paint accumulation."""
-    if paint_state.get("point_field") is not None:
-        return True
     node = robot.getFromDef("PAINT_POINTSET")
+    r, g, b = color
     if node is None:
-        r, g, b = PAINT_MARK_COLOR
         proto = (
             "DEF PAINT_POINTSET Shape { "
             "appearance Appearance { "
@@ -912,6 +947,11 @@ def _ensure_paint_layer(robot, paint_state: dict) -> bool:
     if node is None:
         return False
     try:
+        # Update material color on every call so color changes take effect mid-job.
+        app = node.getField("appearance").getSFNode()
+        mat = app.getField("material").getSFNode()
+        mat.getField("diffuseColor").setSFColor([r, g, b])
+        mat.getField("emissiveColor").setSFColor([r * 0.45, g * 0.45, b * 0.45])
         geom = node.getField("geometry").getSFNode()
         coord = geom.getField("coord").getSFNode()
         paint_state["shape_node"] = node
@@ -923,8 +963,14 @@ def _ensure_paint_layer(robot, paint_state: dict) -> bool:
         return False
 
 
-def _append_paint_point(robot, base_node, surface_pt_base: np.ndarray, paint_state: dict) -> None:
-    if not _ensure_paint_layer(robot, paint_state):
+def _append_paint_point(
+    robot,
+    base_node,
+    surface_pt_base: np.ndarray,
+    paint_state: dict,
+    color: tuple[float, float, float] = PAINT_MARK_COLOR,
+) -> None:
+    if not _ensure_paint_layer(robot, paint_state, color):
         return
     base_pose = np.array(base_node.getPose(), dtype=np.float64).reshape(4, 4)
     p = np.asarray(surface_pt_base, dtype=np.float64)
@@ -960,15 +1006,15 @@ def deposit_spray_stamp(
     surface_normal_base: np.ndarray,
     paint_state: dict,
     rng: np.random.Generator,
+    color: tuple[float, float, float] = PAINT_MARK_COLOR,
 ) -> None:
     """Drop a small spray-like cluster around one raster point."""
     t1, t2 = _build_tangent_frame(surface_normal_base)
     for _ in range(SPRAY_STAMP_DOTS):
-        # Uniform disk sample in tangent plane.
         r = SPRAY_STAMP_RADIUS_M * math.sqrt(float(rng.random()))
         a = 2.0 * math.pi * float(rng.random())
         offset = (math.cos(a) * r) * t1 + (math.sin(a) * r) * t2
-        _append_paint_point(robot, base_node, surface_pt_base + offset, paint_state)
+        _append_paint_point(robot, base_node, surface_pt_base + offset, paint_state, color)
 
 
 def clear_paint_marks(paint_state: dict) -> int:
@@ -1369,6 +1415,9 @@ def main():
                     plan = plan_try
                     plan["paint_idx"] = 0
                     plan["paint_waypoint_tick"] = 0
+                    plan["paint_color"] = _color_to_rgb(
+                        (remote_req.get("params") or {}).get("color", "white")
+                    )
                     state, state_tick = "PAINT", 0
                     continue
                 pending_select = {
@@ -1438,11 +1487,15 @@ def main():
                 plan = plan_try
                 plan["paint_idx"] = 0
                 plan["paint_waypoint_tick"] = 0
+                plan["paint_color"] = _color_to_rgb(
+                    (remote_req.get("params") or {}).get("color", "white")
+                )
                 u_ext, v_ext = plan["bbox"]
                 n_wp = len(plan["waypoints"])
                 print(
                     f"[painter][PLAN][API] {plan['cls_name']} operator-mask "
-                    f"bbox={u_ext:.2f}×{v_ext:.2f}m n={n_wp}"
+                    f"bbox={u_ext:.2f}×{v_ext:.2f}m n={n_wp} "
+                    f"color={plan['paint_color']}"
                 )
                 state, state_tick = "PAINT", 0
                 continue
@@ -1472,6 +1525,7 @@ def main():
                 plan = None
                 state, state_tick = "IDLE", 0
                 continue
+            paint_color = plan.get("paint_color", PAINT_MARK_COLOR)
             # Process multiple waypoints per tick to make the spray pass faster.
             for _ in range(WAYPOINTS_PER_TICK):
                 idx = plan["paint_idx"]
@@ -1486,6 +1540,7 @@ def main():
                         surface_normal,
                         paint_state,
                         rng,
+                        paint_color,
                     )
                     if idx % 25 == 0 or idx == n_wp - 1:
                         print(
