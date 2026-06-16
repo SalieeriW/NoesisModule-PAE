@@ -152,6 +152,15 @@ Static PNG references for the flow (session, live camera, mask edit, paint, hist
 
 ---
 
+## Authors
+
+- Isabel Salazar
+- Xuanyi Qiu
+- David Borrero
+- Songhe Wang
+
+---
+
 ## License
 
 This project is open source and licensed under the **Apache License 2.0**. See the [LICENSE](./LICENSE) file for the full text.
