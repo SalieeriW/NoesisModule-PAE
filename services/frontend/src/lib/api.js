@@ -1,4 +1,4 @@
-const TOKEN_KEY = "paintcell_token";
+const TOKEN_KEY = "noemodule_token";
 
 function normalizeApiBase() {
   const raw = import.meta.env.VITE_API_BASE;

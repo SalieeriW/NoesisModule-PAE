@@ -42,7 +42,7 @@ export function Register() {
 
   return (
     <div className="auth-page">
-      <Link to="/" className="auth-page__back">← PaintCell</Link>
+      <Link to="/" className="auth-page__back">← NoeModule</Link>
 
       <div className="auth-card fade-in">
         <div className="auth-card__brand">
@@ -50,7 +50,7 @@ export function Register() {
           <h1 className="auth-card__title">Create account</h1>
         </div>
 
-        <p className="auth-card__sub">Register as a PaintCell operator.</p>
+        <p className="auth-card__sub">Register as a NoeModule operator.</p>
 
         {error && (
           <div className="banner banner--error banner--compact">

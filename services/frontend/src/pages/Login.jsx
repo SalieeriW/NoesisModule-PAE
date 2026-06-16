@@ -34,7 +34,7 @@ export function Login() {
 
   return (
     <div className="auth-page">
-      <Link to="/" className="auth-page__back">← PaintCell</Link>
+      <Link to="/" className="auth-page__back">← NoeModule</Link>
 
       <div className="auth-card fade-in">
         <div className="auth-card__brand">

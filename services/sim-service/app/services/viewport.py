@@ -14,7 +14,7 @@ JPEG_QUALITY = 92
 
 def workspace_root() -> Path:
     """Directory that contains ``controllers/`` (Docker: /workspace, local dev: Attemp2 repo root)."""
-    env = os.environ.get("PAINTCELL_WORKSPACE", "").strip()
+    env = os.environ.get("NOEMODULE_WORKSPACE", "").strip()
     if env:
         return Path(env).resolve()
     if Path("/workspace/controllers").is_dir():
@@ -71,7 +71,7 @@ def load_latest_viewport_jpeg() -> bytes:
         raise FileNotFoundError(
             "No viewport RGB cache. Run Webots with painter_controller + "
             "--viewport-camera-feed so viewport_cache/rgb.npy updates. "
-            f"Expected: {rgb_path} (set PAINTCELL_WORKSPACE if controllers live elsewhere)."
+            f"Expected: {rgb_path} (set NOEMODULE_WORKSPACE if controllers live elsewhere)."
         )
     rgb = np.load(rgb_path)
     if rgb.dtype != np.uint8:

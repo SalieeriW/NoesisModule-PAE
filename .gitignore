@@ -20,3 +20,6 @@ controllers/painter_controller/debug/*.png
 __pycache__/
 *.py[cod]
 .pytest_cache/
+
+# macOS
+.DS_Store

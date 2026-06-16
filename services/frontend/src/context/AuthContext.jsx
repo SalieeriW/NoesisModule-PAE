@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import { apiLogin, apiRegister } from "../lib/api";
 
-const TOKEN_KEY = "paintcell_token";
+const TOKEN_KEY = "noemodule_token";
 
 function decodeJwtPayload(token) {
   try {

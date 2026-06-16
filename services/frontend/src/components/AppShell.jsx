@@ -20,7 +20,7 @@ export function AppShell() {
         <div className="shell__brand">
           <Logo size={36} />
           <div>
-            <p className="shell__product">PaintCell</p>
+            <p className="shell__product">NoeModule</p>
             <p className="shell__tagline">Workcell control</p>
           </div>
         </div>

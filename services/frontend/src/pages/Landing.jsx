@@ -234,7 +234,7 @@ export function Landing() {
       <nav className="lp__nav">
         <div className="lp__nav-brand">
           <Logo size={28} />
-          <span className="lp__nav-name">PaintCell</span>
+          <span className="lp__nav-name">NoeModule</span>
         </div>
         <div className="lp__nav-links">
           <Link to="/login" className="btn btn--ghost btn--sm">Sign in</Link>
@@ -303,7 +303,7 @@ export function Landing() {
       </section>
 
       <footer className="lp__footer">
-        <p>PaintCell · Workcell Control · © {new Date().getFullYear()}</p>
+        <p>NoeModule · Workcell Control · © {new Date().getFullYear()}</p>
       </footer>
     </div>
   );
