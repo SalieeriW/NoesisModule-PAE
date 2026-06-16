@@ -1,4 +1,4 @@
-# PaintCell — Car Painting MVP
+# NoeModule — Car Painting MVP
 
 End-to-end lab stack: operators drive a **Webots** painting cell through a **React** UI, while a **FastAPI** backend records sessions and coordinates **YOLO** masks, operator-approved PNGs, and paint jobs. This README focuses on **what runs where**, **what each piece does**, and **how to start it**.
 
@@ -76,7 +76,7 @@ Docker does **not** start Webots. For a live cell you run Webots with the painte
 
 - **`viewport_cache`** (under `controllers/painter_controller/viewport_cache/`) holds numpy/image artifacts and JSON the UI and sim-service rely on (e.g. `rgb.npy`, depth, detections, **`mask_exports/*.png`**).
 - Operator-edited masks uploaded through the UI land in **`mask_exports`** via **sim-service**; the painter prefers those PNG paths when executing an approved paint job.
-- If paths differ on your machine, set **`PAINTCELL_WORKSPACE`** to the **repository root** that contains `controllers/` so both Webots and tools resolve the same workspace.
+- If paths differ on your machine, set **`NOEMODULE_WORKSPACE`** to the **repository root** that contains `controllers/` so both Webots and tools resolve the same workspace.
 
 ---
 
@@ -149,3 +149,19 @@ Static PNG references for the flow (session, live camera, mask edit, paint, hist
 - **503 / sim unreachable from backend:** Ensure **sim-service** is healthy (`docker compose ps`) and port `8081` is free.
 - **Empty viewport / mask 404:** Confirm Webots is running with the viewport feed and that **`controllers/painter_controller/viewport_cache`** is populated; **sim-service** must see the same bind-mounted `controllers` path as your repo.
 - **CORS in the browser:** The backend allows local and typical LAN origins; use the Vite dev proxy or open the UI on `localhost`/`127.0.0.1` as configured.
+
+---
+
+## License
+
+This project is open source and licensed under the **Apache License 2.0**. See the [LICENSE](./LICENSE) file for the full text.
+
+```
+Copyright 2026 NoeModule
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+```
